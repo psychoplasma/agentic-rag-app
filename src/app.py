@@ -1,6 +1,8 @@
 import os
+import tempfile
+from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from src.utils import authenticate_vertex_ai
@@ -51,14 +53,35 @@ async def ask(request: QuestionRequest):
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=str(e))
-    
+
 @app.post("/process-repo")
 async def process_repo(repo: ProcessRepository):
     try:
-        num_chunks = process_repository(repo.path)
+        num_chunks = await process_repository(repo.path)
         return {"message": f"Processed {num_chunks} code files"}
     except Exception as e:
         print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/process")
+async def process(file: UploadFile = File(...)):
+    try:
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create full file path
+            temp_file_path = Path(temp_dir) / file.filename
+            
+            # Save uploaded file
+            with open(temp_file_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            
+            # Process the saved file
+            num_chunks = await process_repository(str(temp_file_path))
+            return {"message": f"Processed {num_chunks} code files"}
+            
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")

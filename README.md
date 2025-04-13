@@ -26,12 +26,17 @@ Vector store will be loaded with collection of javascript code source files, the
    - Context retrieval system
    - Google Vertex AI integration for LLM
 
-
 ## Building
 
 ### Install `uv`
 
 How to install [`uv`](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer)
+
+Create a new virtual environment using `uv`:
+
+```shell
+uv venv .venv
+```
 
 Activate virtual environment
 
