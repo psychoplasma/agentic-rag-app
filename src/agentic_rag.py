@@ -1,5 +1,5 @@
 import os
-from document_processors.pdf_processor import PDFProcessor
+
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -11,31 +11,32 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from typing import Any, Literal
 
-from prompts import (
-    generate_js_code_prompt,
-    generate_reply_prompt,
-    grade_relevance_prompt,
-    improve_question_prompt,
-    translate_to_korean_prompt,
-)
 from pydantic import BaseModel, Field
 
 from langchain_google_vertexai import VertexAIEmbeddings
 
+from src.document_processors.pdf_processor import PDFProcessor
 from src.document_processors.javacript_code_processor import JSCodeDocumentProcessor
 from src.vector_store.chromadb import ChromaDB
 from src.vector_store.vertexai_vector_search import VertexAIVectorStore
 from src.tools.javascript_executor.tool import JSCodeExecutor
+from src.prompts import (
+    generate_js_code_prompt,
+    generate_reply_prompt,
+    grade_relevance_prompt_template,
+    improve_question_prompt,
+    translate_to_korean_prompt,
+)
 
 
 PY_ENV = os.environ.get("PY_ENV")
-PROJECT_ID = os.environ.get("PROJECT_ID")
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 REGION = os.environ.get("INDEX_REGION")
 BUCKET_URI = os.environ.get("BUCKET_URI")
 INDEX_ID = os.environ.get("INDEX_ID")
 INDEX_ENDPOINT_ID = os.environ.get("INDEX_ENDPOINT_ID")
 AGENT_MODE = os.environ.get("AGENT_MODE")
-MEMORY_ENABLED = os.environ.get("MEMORY_ENABLED")
+MEMORY_ENABLED = os.environ.get("MEMORY_ENABLED").lower() == "true"
 
 embeddings_model = VertexAIEmbeddings(model="text-embedding-005")
 llm = init_chat_model(
@@ -83,13 +84,11 @@ def grade_documents(state: MessagesState) -> Literal["generate", "rewrite"]:
     # LLM with tool and validation
     llm_with_structured_output = llm.with_structured_output(Grade)
 
-    # Prompt
-    msg = grade_relevance_prompt(
-        query=state["messages"][0].content,
-        context=state["messages"][-1].content,
-    )
-
-    grade = llm_with_structured_output.invoke([msg])
+    grading_prompt = grade_relevance_prompt_template()
+    grade = (grading_prompt | llm_with_structured_output).invoke({
+        "question": state["messages"][0].content,
+        "context": state["messages"][-1].content,
+    })
 
     return "generate"if grade.binary_score == "yes" else "rewrite"
 
@@ -233,7 +232,7 @@ def build_text_agent():
     """Create langgraph workflow for text agent."""
 
     workflow = StateGraph(MessagesState)
-    workflow.add_node("translate", translate)
+    # workflow.add_node("translate", translate)
     workflow.add_node("agent", agent)
     workflow.add_node("retrieve", ToolNode([retriever]))
     workflow.add_node("rewrite", rewrite)
@@ -241,8 +240,8 @@ def build_text_agent():
     workflow.add_node("execute", execute)
     workflow.add_node("grade_documents", grade_documents)
 
-    workflow.add_edge(START, "translate")
-    workflow.add_edge("translate", "agent")
+    workflow.add_edge(START, "agent")
+    # workflow.add_edge("translate", "agent")
     workflow.add_conditional_edges(
         "agent",
         tools_condition,
@@ -263,8 +262,10 @@ def build_agent():
     workflow = build_js_code_agent() if AGENT_MODE == "js_code" else build_text_agent()
 
     if MEMORY_ENABLED:
+        print("Memory is enabled.")
         return workflow.compile(checkpointer=MemorySaver())
     else:
+        print("Memory is disabled.")
         return workflow.compile()
 
 def ask_agent(

@@ -71,11 +71,12 @@ def grade_relevance_prompt(query: str, context: str):
         Give a binary score 'yes' or 'no' score to indicate whether the context is relevant to the question.""",
     )
 
-PromptTemplate(
-    template="""You are a grader assessing relevance of a retrieved document to a user question. \n 
-    Retrieved document: \n\n {context} \n\n
-    User question: \n\n {question} \n\n
-    If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
-    Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.""",
-    input_variables=["context", "question"],
-)
+def grade_relevance_prompt_template():
+    return PromptTemplate(
+        template="""You are a grader assessing relevance of a retrieved document to a user question. \n 
+        Retrieved document: \n\n {context} \n\n
+        User question: \n\n {question} \n\n
+        If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
+        Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.""",
+        input_variables=["context", "question"],
+    )
