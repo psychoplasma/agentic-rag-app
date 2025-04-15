@@ -1,5 +1,5 @@
 # Dependency stage
-FROM node:23-alpine as deps
+FROM node:23-alpine AS deps
 
 # Set working directory
 WORKDIR /app
@@ -12,7 +12,7 @@ COPY yarn.lock ./yarn.lock
 RUN yarn install --frozen-lockfile
 
 # Build stage
-FROM node:23-alpine as builder
+FROM node:23-alpine AS builder
 
 # Set working directory
 WORKDIR /app
